@@ -1,0 +1,31 @@
+---
+title: "Lab 3: COVID-19"
+subtitle: 'Ecosystem Science and Sustainability 330'
+author:
+  - name: Stephanie Farmer 
+    email: stephaniefarmer2003@gmail.com
+    website: 
+format: html
+execute: 
+  echo: true 
+editor: visual
+---
+
+```{r}
+library(zoo)
+library(flextable)
+library(tidyverse)
+
+plot (cars)
+```
+
+
+
+#Question 1: How does easy access to historical and real-time environmental data shape our understanding of climate trends, resource management, and public health? What happens when this data disappears or becomes inaccessible?
+
+
+
+```{r}
+data = read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
+```
+
