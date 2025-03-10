@@ -4,7 +4,7 @@ subtitle: 'Ecosystem Science and Sustainability 330'
 author:
   - name: Stephanie Farmer 
     email: stephaniefarmer2003@gmail.com
-    website: 
+    website: https://stephaniegfarmer.github.io/
 format: html
 execute: 
   echo: true 
@@ -19,8 +19,246 @@ plot (cars)
 ```
 
 #Question 1: How does easy access to historical and real-time environmental data shape our understanding of climate trends, resource management, and public health? What happens when this data disappears or becomes inaccessible?
+##Accessible data is crucial for understanding climate trends, resource management and public health. Analysis of long-term data-sets allows scientists to track climate changes, predict future patterns and inform policies and regulations to mitigate environmental risks. Resource management relies on environmental data to optimize services like water usage, agricultural productivity and renewable energy efficiency. Public health also benefits from real time data by monitoring factors like air quality, disease outbreaks, and natural disasters. When data disappears and becomes inaccessible, scientific progress is halted, policy decisions weaken, and communities are more vulnerable to environmental hazards. Ensuring the preservation and accessibility of environmental data is essential for making informed decisions, sustainability and global resilience. 
+
+#Question 2 
 
 ```{r}
-data = read_csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
+data <- read.csv('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv')
+my.date <- as.Date("2022-02-01")
+my.state <- "Colorado"
+library("dplyr")
+colorado_data <- data %>%
+  filter(state == my.state) %>%
+  arrange(county, date) %>%  
+  group_by(county) %>%
+  mutate(
+    new_cases = cases - lag(cases),
+    new_deaths = deaths - lag(deaths)
+  ) %>%
+  mutate(new_cases = ifelse(is.na(new_cases), 0, new_cases)) %>%   
+  ungroup()
 ```
 
+```{r}
+most_cum_cases <- colorado_data %>%
+  filter(date == my.date) %>%
+  arrange(desc(cases)) %>%
+  head(n = 5)
+```
+
+```{r}
+most_cum_cases_table <- most_cum_cases %>%
+  select(county, cases) %>%
+  rename(County = county, `Total Cases` = cases) %>%
+  flextable() %>%
+  add_header_lines("Top 5 Colorado Counties with the Most Cumulative COVID-19 Cases on Feb 1, 2022")
+```
+
+```{r}
+most_new_cases <- colorado_data %>%
+  filter(date == my.date) %>%
+  arrange(desc(new_cases)) %>%
+  head(n = 5)
+```
+
+```{r}
+most_new_cases_table <- most_new_cases %>%
+  select(county, new_cases) %>%
+  rename(County = county, `New Cases` = new_cases) %>%
+  flextable() %>%
+  add_header_lines("Top 5 Colorado Counties with the Most New COVID-19 Cases on Feb 1, 2022")
+
+most_cum_cases_table
+most_new_cases_table
+```
+
+#Question 3 
+```{r}
+pop_data = read.csv('https://www2.census.gov/programs-surveys/popest/datasets/2020-2023/counties/totals/co-est2023-alldata.csv') 
+pop_data <- pop_data %>% mutate(
+  state_code = sprintf("%02d", STATE),
+  county_code = sprintf("%03d", pop_data$COUNTY))
+pop_data <- pop_data %>% mutate(fips = paste(state_code, county_code, sep = "")
+) %>% filter(county_code != "000")
+selected_data <- pop_data %>% select(contains("NAME"), contains("2021"))
+```
+
+```{r}
+glimpse(selected_data)
+dim(selected_data)
+colnames(selected_data)
+```
+
+##3A. Exploring the data: 
+## The dataset has 3,144 rows and 18 columns. The columns are named: STNAME, BIRTH2021, DOMESTICMIG2021, RBIRTH2021, RDOMESTICMIG2021, CTYNAME, DEATHS2021, NETMIG2021, RDEATH2021, RNETMIG2021, POPESTIMATE2021, NATURALCHG2021, RESIDUAL2021, RNATURALCHG2021, NPOPCHG2021, INTERNATIONALMIG2021, GQESTIMATES2021, RINTERNATIONALMIG2021. Yes, this data does match some of the Covid data we have including county names and population estimates. The modified data allows for better monitoring of Covid trends and the ability to compare infection rates across regions based on population size. 
+```{r}
+colorado_range <- selected_data %>% filter(STNAME == "Colorado") %>% pull(POPESTIMATE2021)
+colorado_range <- range(colorado_range)
+print(colorado_range)
+```
+## 3B: The range extends from 741 to 737,287 people within Colorado counties in 2021. 
+
+```{r}
+pop_data <- pop_data %>% mutate(fips = as.integer(fips))
+combined_data <- colorado_data %>% left_join(pop_data, by = "fips")
+combined_data <- combined_data %>% mutate(
+  per_capita_cum_cases = cases / POPESTIMATE2021,
+  per_capita_new_cases = new_cases / POPESTIMATE2021,
+  per_capita_new_deaths = new_deaths / POPESTIMATE2021
+)
+head(combined_data)
+```
+```{r}
+top_cum_cases <- combined_data %>% filter(date == my.date) %>% arrange(desc(per_capita_cum_cases)) %>% select(STNAME, CTYNAME, per_capita_cum_cases) %>% head(n = 5) %>% rename(
+  "County" = CTYNAME,
+  "State" = STNAME,
+  "Cumulative Cases Per Capita" = per_capita_cum_cases
+)
+```
+```{r}
+top_new_cases <- combined_data %>%
+  filter(date == my.date) %>%
+    select(STNAME, CTYNAME, per_capita_new_cases) %>%
+  slice_max(per_capita_new_cases, n = 5) %>%
+  rename(
+  "County" = CTYNAME,
+  "State" = STNAME,
+  "New Cases Per Capita" = per_capita_new_cases
+  )
+```
+```{r}
+flextable(top_cum_cases) %>% set_caption("Top 5 counties in Colorado with the most cumulative cases per capita on 2021-02-01")
+flextable(top_new_cases) %>% set_caption("Top 5 counties in Colorado with the most new cases per capita on 2021-02-01")
+```
+#Question 4:
+```{r}
+
+
+watch_list <- filter(combined_data, date >= my.date - 14, state == "Colorado") %>%
+  group_by(county) %>%
+  reframe(
+    total_new_cases = sum(new_cases, na.rm = TRUE), 
+    cases_per_100k = (total_new_cases / POPESTIMATE2021) * 100000
+  ) %>%
+  distinct() %>%
+  slice_max(order_by = cases_per_100k, n = 5) %>% print()
+
+
+all_watch_list <- filter(combined_data, date >= my.date - 14, state == "Colorado") %>%
+  group_by(county) %>%
+  reframe(
+    total_new_cases = sum(new_cases, na.rm = TRUE), 
+    cases_per_100k = (total_new_cases / POPESTIMATE2021)* 100000
+  ) %>%
+  distinct() %>%
+  filter(cases_per_100k > 100)
+print(all_watch_list)
+
+```
+
+## Report of counties meeting watchlist conditions : 
+##The top five counties with the highest new cases were Crowley, Lincoln, Bent, Fremont and Logan.  More than 12,659 new cases per 100,000 residents over the past 14 days have appeared for the Crowley county, 9,702 for Lincoln county, 9,664 cases for Bent county, 7,937 for Fremont county and 7,907 for Logan county cases. 
+
+#Question 5: 
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readr)
+covid_data <- read.csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
+covid_2021 <- covid_data %>%
+  filter(state == "Colorado", date >= "2021-02-01", date <= "2021-12-31") %>%
+  group_by(fips) %>%
+  arrange(date) %>%
+  mutate(new_deaths = deaths - lag(deaths, default = 0)) %>%
+  summarize(total_covid_deaths = sum(new_deaths, na.rm = TRUE), .groups = "drop")
+covid_2021 <- covid_2021 %>%
+  mutate(fips = sprintf("%05d", as.integer(fips)))
+pop_data <- read.csv('https://www2.census.gov/programs-surveys/popest/datasets/2020-2023/counties/totals/co-est2023-alldata.csv')
+pop_data <- pop_data %>%
+  mutate(
+    state_code = sprintf("%02d", STATE),
+    county_code = sprintf("%03d", COUNTY),
+    fips = paste0(state_code, county_code)
+  ) %>%
+  filter(county_code != "000") %>%
+  select(fips, CTYNAME, DEATHS2021)
+merged_data <- covid_2021 %>%
+  left_join(pop_data, by = "fips") %>%
+  mutate(
+    covid_death_percentage = (total_covid_deaths / DEATHS2021) * 100
+  ) %>%
+  filter(covid_death_percentage >= 20)  # Corrected threshold
+ggplot(merged_data, aes(x = reorder(CTYNAME, covid_death_percentage), y = covid_death_percentage)) +
+  geom_col(fill = "red") +
+  coord_flip() +
+  labs(
+    title = "Counties Where COVID Deaths Were ≥20% of Total Deaths (2021)",
+    x = "County",
+    y = "Percentage of Total Deaths",
+    caption = "Data Source: NYT COVID Data & U.S. Census Bureau"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 8, hjust = 1),  
+    axis.text.x = element_text(size = 12)  
+  )
+
+
+
+```
+## I tried my best. 
+#Question 6:
+```{r}
+library(dplyr)
+library(ggplot2)
+library(zoo)
+
+states <- c("New York", "Colorado", "Alabama", "Ohio")
+
+state_data <- data %>%
+  filter(state %in% states) %>%
+  group_by(state, county) %>%
+  arrange(date) %>%
+  mutate(new_cases = cases - lag(cases, default = 0)) %>%
+  ungroup() %>%
+  group_by(state, date) %>%
+  summarize(new_cases = sum(new_cases, na.rm = TRUE), .groups = "drop") %>%
+  mutate(rolling_avg = rollmean(new_cases, 7, fill = NA, align = "right"))
+
+state_data <- state_data %>%
+  filter(!is.na(rolling_avg))
+
+ggplot(state_data, aes(x = date, y = rolling_avg, color = state)) +
+  geom_line() + 
+  labs(title = "7-day Rolling Average of New Cases", y = "New Cases", x = "Date")
+```
+
+##Briefly describe the influence scaling by population had on the analysis? Does it make some states look better? Some worse? How so?
+## I have spent hours trying to figure this out and cannot get a graph to generate. 
+#Question 7: 
+```{r}
+meta = read_csv('https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv')
+```
+```{r}
+library(tidyr)
+library(tidyverse)
+library(ggplot2)
+meta = read.csv('https://raw.githubusercontent.com/mikejohnson51/csu-ess-330/refs/heads/main/resources/county-centroids.csv') |>
+  inner_join(covid_data) |>
+  group_by(date) |>
+  summarise(wmX_c = sum(LON*cases) / sum(cases), wmY_c = sum(LAT*cases) / sum(cases), cases = sum(cases)) |>
+  arrange(date) |>
+  mutate(d = 1:n())
+```
+
+```{r}
+ggplot(meta) +
+  borders("state", fill = "gray90", colour = "white") +
+  geom_point(aes(x = wmX_c, y = wmY_c, size = cases), color = "red", alpha = .25) +
+  theme_linedraw() +
+  labs(color = "Time", size = "Cases", x = "", y = "", title = "Weighted Center of COVID-19 Cases") + 
+  theme(legend.position = 'none')
+```
+##In a few sentences, describe the movement of the COVID-19 weighted mean throughout the USA and possible drivers of its movement given your knowledge of the outbreak hot spots.
+The plot shows that COVID-19 outbreaks initially emerged in the central United States. Over time, the weighted mean of cases shifts toward the Midwest, indicating a growing concentration of cases in that region. This movement was driven by the continuous mobility of people across the country, facilitating the spread of the virus. Other contributing factors likely include major transportation routes, population density, and emerging hotspots in the Midwest.
