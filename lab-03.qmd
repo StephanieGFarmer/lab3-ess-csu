@@ -261,4 +261,4 @@ ggplot(meta) +
   theme(legend.position = 'none')
 ```
 ##In a few sentences, describe the movement of the COVID-19 weighted mean throughout the USA and possible drivers of its movement given your knowledge of the outbreak hot spots.
-The plot shows that COVID-19 outbreaks initially emerged in the central United States. Over time, the weighted mean of cases shifts toward the Midwest, indicating a growing concentration of cases in that region. This movement was driven by the continuous mobility of people across the country, facilitating the spread of the virus. Other contributing factors likely include major transportation routes, population density, and emerging hotspots in the Midwest.
+##The plot shows that COVID-19 outbreaks initially emerged in the central United States. Over time, the weighted mean of cases shifts toward the Midwest, indicating a growing concentration of cases in that region. This movement was driven by the continuous mobility of people across the country, facilitating the spread of the virus. Other contributing factors likely include major transportation routes, population density, and emerging hotspots in the Midwest.
